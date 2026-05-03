@@ -1,0 +1,994 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>BIS Standards Finder</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,600;1,9..144,400&family=IBM+Plex+Mono:wght@400;500&family=Geist:wght@300;400;500&display=swap" rel="stylesheet"/>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --ink: #0f0e0c;
+  --paper: #f7f4ef;
+  --paper-mid: #edeae3;
+  --saffron: #d4690a;
+  --saffron-pale: #fdf3e7;
+  --green-india: #0a6e35;
+  --green-pale: #e8f5ed;
+  --navy: #1b2a4a;
+  --muted: #6b6860;
+  --border: #dbd7cf;
+  --white: #ffffff;
+  --card-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.05);
+  --bg-overlay: rgba(247,244,239,0.82);
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: 'Geist', -apple-system, sans-serif;
+  background: var(--paper);
+  color: var(--ink);
+  min-height: 100vh;
+  font-size: 15px;
+  line-height: 1.6;
+  overflow-x: hidden;
+}
+
+/* ── Dynamic Background ── */
+#bg-canvas {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  transition: opacity 0.8s ease;
+}
+#bg-image {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background-size: cover;
+  background-position: center;
+  transition: opacity 1.2s ease, background-image 0s 1.2s;
+  opacity: 0;
+}
+#bg-image.visible { opacity: 1; }
+#bg-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  background: var(--bg-overlay);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+}
+main, header { position: relative; z-index: 2; }
+
+/* ── Splash Screen ── */
+#splash {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: var(--navy);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  transition: opacity 0.6s ease, visibility 0.6s ease;
+}
+#splash.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+
+.splash-flag {
+  display: flex;
+  width: 60px;
+  height: 40px;
+  border-radius: 4px;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+  animation: flagPulse 2s ease-in-out infinite;
+}
+@keyframes flagPulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
+  50% { transform: scale(1.05); box-shadow: 0 8px 32px rgba(255,153,51,0.4); }
+}
+.splash-stripe { flex: 1; }
+.splash-stripe.s { background: #FF9933; }
+.splash-stripe.w { background: #fff; display: flex; align-items: center; justify-content: center; }
+.splash-stripe.g { background: #138808; }
+.splash-wheel {
+  width: 16px; height: 16px;
+  border: 2px solid #000080;
+  border-radius: 50%;
+  animation: spin 3s linear infinite;
+}
+
+.splash-title {
+  font-family: 'Fraunces', serif;
+  font-size: 28px;
+  font-weight: 600;
+  color: white;
+  letter-spacing: -0.02em;
+  text-align: center;
+}
+.splash-title em { color: #FF9933; font-style: italic; }
+
+/* Animated dots loader */
+.splash-dots {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.splash-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.3);
+  animation: dotPulse 1.4s ease-in-out infinite both;
+}
+.splash-dot:nth-child(1) { animation-delay: 0s; }
+.splash-dot:nth-child(2) { animation-delay: 0.2s; }
+.splash-dot:nth-child(3) { animation-delay: 0.4s; }
+@keyframes dotPulse {
+  0%, 80%, 100% { background: rgba(255,255,255,0.2); transform: scale(0.8); }
+  40% { background: #FF9933; transform: scale(1.2); }
+}
+
+.splash-status {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: rgba(255,255,255,0.45);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  animation: textFade 2s ease-in-out infinite;
+}
+@keyframes textFade {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+
+/* ── Header ── */
+header {
+  border-bottom: 1px solid rgba(219,215,207,0.6);
+  background: rgba(255,255,255,0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  padding: 0 40px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+}
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--navy);
+  letter-spacing: -0.01em;
+}
+.logo-flag {
+  display: flex;
+  width: 24px;
+  height: 16px;
+  border-radius: 2px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.flag-stripe { flex: 1; }
+.flag-stripe.saffron { background: #FF9933; }
+.flag-stripe.white { background: #fff; display: flex; align-items: center; justify-content: center; }
+.flag-stripe.green { background: #138808; }
+.ashoka-dot { width: 6px; height: 6px; border-radius: 50%; background: #000080; }
+.header-tag {
+  font-size: 11px;
+  color: var(--muted);
+  background: rgba(237,234,227,0.8);
+  padding: 3px 10px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+}
+
+/* ── Hero ── */
+.hero {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 64px 24px 40px;
+  text-align: center;
+}
+.hero-eyebrow {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--saffron);
+  margin-bottom: 16px;
+  animation: fadeInUp 0.6s ease both;
+}
+.hero h1 {
+  font-family: 'Fraunces', serif;
+  font-size: clamp(32px, 5vw, 52px);
+  font-weight: 600;
+  line-height: 1.1;
+  color: var(--navy);
+  letter-spacing: -0.02em;
+  margin-bottom: 14px;
+  animation: fadeInUp 0.6s 0.1s ease both;
+}
+.hero h1 em { font-style: italic; color: var(--saffron); }
+.hero-sub {
+  font-size: 16px;
+  color: var(--muted);
+  max-width: 480px;
+  margin: 0 auto 36px;
+  line-height: 1.65;
+  animation: fadeInUp 0.6s 0.2s ease both;
+}
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Category pills ── */
+.category-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 20px;
+  animation: fadeInUp 0.6s 0.4s ease both;
+}
+.pill {
+  font-size: 12px;
+  padding: 5px 14px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,0.8);
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: 'Geist', sans-serif;
+  backdrop-filter: blur(4px);
+}
+.pill:hover, .pill.active {
+  border-color: var(--saffron);
+  color: var(--saffron);
+  background: var(--saffron-pale);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(212,105,10,0.15);
+}
+
+/* ── Search box ── */
+.search-box {
+  background: rgba(255,255,255,0.92);
+  border: 1.5px solid var(--border);
+  border-radius: 16px;
+  padding: 4px;
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+  transition: border-color 0.2s, box-shadow 0.2s;
+  backdrop-filter: blur(8px);
+  animation: fadeInUp 0.6s 0.3s ease both;
+}
+.search-box:focus-within {
+  border-color: var(--saffron);
+  box-shadow: 0 0 0 3px rgba(212,105,10,0.1), 0 4px 24px rgba(0,0,0,0.08);
+}
+.search-box textarea {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-family: 'Geist', sans-serif;
+  font-size: 15px;
+  color: var(--ink);
+  resize: none;
+  padding: 12px 14px;
+  min-height: 60px;
+  max-height: 160px;
+  line-height: 1.5;
+}
+.search-box textarea::placeholder { color: var(--muted); }
+.search-btn {
+  flex-shrink: 0;
+  background: var(--navy);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  padding: 0 20px;
+  height: 44px;
+  font-family: 'Geist', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 2px;
+  transition: background 0.15s, transform 0.1s, box-shadow 0.15s;
+}
+.search-btn:hover {
+  background: var(--saffron);
+  box-shadow: 0 4px 16px rgba(212,105,10,0.3);
+  transform: translateY(-1px);
+}
+.search-btn:active { transform: scale(0.97) translateY(0); }
+.search-btn:disabled { background: var(--muted); cursor: not-allowed; transform: none; box-shadow: none; }
+.search-btn svg { width: 14px; height: 14px; }
+
+/* ── Results section ── */
+.results-section {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 0 24px 80px;
+}
+
+/* ── Loading state ── */
+.loading-state {
+  text-align: center;
+  padding: 48px 24px;
+  display: none;
+}
+.loading-state.active { display: block; }
+
+/* Animated BIS loader */
+.bis-loader {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 20px;
+}
+.bis-bar {
+  width: 4px;
+  border-radius: 2px;
+  background: var(--saffron);
+  animation: barBounce 1s ease-in-out infinite;
+}
+.bis-bar:nth-child(1) { height: 20px; animation-delay: 0s; background: #FF9933; }
+.bis-bar:nth-child(2) { height: 32px; animation-delay: 0.15s; background: var(--navy); }
+.bis-bar:nth-child(3) { height: 24px; animation-delay: 0.3s; background: #138808; }
+.bis-bar:nth-child(4) { height: 36px; animation-delay: 0.45s; background: var(--saffron); }
+.bis-bar:nth-child(5) { height: 20px; animation-delay: 0.6s; background: var(--navy); }
+@keyframes barBounce {
+  0%, 100% { transform: scaleY(0.5); opacity: 0.5; }
+  50% { transform: scaleY(1); opacity: 1; }
+}
+.loading-label {
+  font-size: 14px;
+  color: var(--muted);
+  font-family: 'IBM Plex Mono', monospace;
+  letter-spacing: 0.05em;
+}
+.loading-sub {
+  font-size: 12px;
+  color: var(--border);
+  margin-top: 4px;
+  animation: textFade 1.8s ease-in-out infinite;
+}
+
+/* ── Error state ── */
+.error-state {
+  background: #fff5f5;
+  border: 1px solid #fecaca;
+  border-radius: 12px;
+  padding: 20px 24px;
+  display: none;
+  margin-top: 24px;
+}
+.error-state.active { display: block; }
+.error-state p { font-size: 14px; color: #b91c1c; }
+
+/* ── Query header ── */
+.query-header { display: none; margin-top: 40px; margin-bottom: 24px; }
+.query-header.active { display: block; }
+.query-label {
+  font-size: 11px;
+  font-family: 'IBM Plex Mono', monospace;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+.query-text {
+  font-family: 'Fraunces', serif;
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--navy);
+  line-height: 1.25;
+}
+
+/* ── Stats bar ── */
+.stats-bar {
+  display: none;
+  align-items: center;
+  gap: 20px;
+  margin-top: 20px;
+  padding: 12px 16px;
+  background: rgba(237,234,227,0.7);
+  border-radius: 10px;
+  font-size: 12px;
+  color: var(--muted);
+  backdrop-filter: blur(4px);
+}
+.stats-bar.active { display: flex; }
+.stat-item { display: flex; align-items: center; gap: 6px; }
+.stat-val { font-weight: 500; color: var(--ink); font-family: 'IBM Plex Mono', monospace; }
+
+/* ── Results grid ── */
+.results-grid { display: flex; flex-direction: column; gap: 14px; }
+
+/* ── Standard card ── */
+.std-card {
+  background: rgba(255,255,255,0.88);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 22px 24px;
+  position: relative;
+  overflow: hidden;
+  animation: cardIn 0.4s ease both;
+  box-shadow: var(--card-shadow);
+  backdrop-filter: blur(8px);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.std-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 24px rgba(0,0,0,0.1);
+}
+.std-card::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 3px;
+  background: linear-gradient(to bottom, #FF9933, var(--saffron), #138808);
+  border-radius: 3px 0 0 3px;
+}
+@keyframes cardIn {
+  from { opacity: 0; transform: translateY(16px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.std-card:nth-child(1) { animation-delay: 0s; }
+.std-card:nth-child(2) { animation-delay: 0.08s; }
+.std-card:nth-child(3) { animation-delay: 0.16s; }
+.std-card:nth-child(4) { animation-delay: 0.24s; }
+.std-card:nth-child(5) { animation-delay: 0.32s; }
+
+.card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.std-id {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--saffron);
+  background: var(--saffron-pale);
+  padding: 3px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(212,105,10,0.2);
+  white-space: nowrap;
+}
+.rank-badge {
+  font-size: 11px;
+  color: var(--muted);
+  background: var(--paper-mid);
+  padding: 3px 9px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+.std-title {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--navy);
+  margin-bottom: 8px;
+  line-height: 1.4;
+}
+.std-rationale {
+  font-size: 14px;
+  color: var(--muted);
+  line-height: 1.6;
+  border-top: 1px solid var(--paper-mid);
+  padding-top: 10px;
+  margin-top: 4px;
+}
+.rationale-label {
+  font-size: 10px;
+  font-family: 'IBM Plex Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--green-india);
+  margin-bottom: 4px;
+}
+
+/* ── Full rationale block ── */
+.full-rationale { display: none; margin-top: 28px; }
+.full-rationale.active { display: block; }
+.rationale-block {
+  background: var(--green-pale);
+  border: 1px solid rgba(10,110,53,0.15);
+  border-radius: 12px;
+  padding: 18px 20px;
+  backdrop-filter: blur(4px);
+}
+.rationale-block-header {
+  font-size: 11px;
+  font-family: 'IBM Plex Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--green-india);
+  margin-bottom: 10px;
+}
+.rationale-block pre {
+  font-family: 'Geist', sans-serif;
+  font-size: 14px;
+  color: #0a4a25;
+  white-space: pre-wrap;
+  line-height: 1.65;
+}
+
+/* ── Learn More button ── */
+.card-footer { margin-top: 14px; }
+.learn-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-family: 'IBM Plex Mono', monospace;
+  color: var(--green-india);
+  background: var(--green-pale);
+  border: 1px solid rgba(10,110,53,0.2);
+  border-radius: 8px;
+  padding: 5px 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.learn-btn:hover {
+  background: #d0eedd;
+  border-color: var(--green-india);
+  transform: translateY(-1px);
+  box-shadow: 0 3px 10px rgba(10,110,53,0.15);
+}
+.learn-btn:disabled { opacity: 0.5; cursor: wait; }
+.learn-btn svg { width: 13px; height: 13px; flex-shrink: 0; }
+
+/* ── Explain box ── */
+.explain-box {
+  margin-top: 12px;
+  background: var(--green-pale);
+  border: 1px solid rgba(10,110,53,0.15);
+  border-radius: 10px;
+  padding: 16px 18px;
+  font-size: 13.5px;
+  color: #0a4a25;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  animation: cardIn 0.25s ease both;
+}
+.explain-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--green-india);
+  padding: 8px 0;
+}
+.explain-spinner {
+  width: 14px; height: 14px;
+  border: 2px solid rgba(10,110,53,0.2);
+  border-top-color: var(--green-india);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Example queries ── */
+.examples { margin-top: 48px; border-top: 1px solid var(--border); padding-top: 36px; }
+.examples-label {
+  font-size: 11px;
+  font-family: 'IBM Plex Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  margin-bottom: 16px;
+}
+.example-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 10px;
+}
+.example-card {
+  background: rgba(255,255,255,0.75);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: left;
+  backdrop-filter: blur(4px);
+}
+.example-card:hover {
+  border-color: var(--saffron);
+  box-shadow: 0 0 0 3px rgba(212,105,10,0.08);
+  transform: translateY(-2px);
+}
+.example-cat {
+  font-size: 10px;
+  font-family: 'IBM Plex Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--saffron);
+  margin-bottom: 5px;
+}
+.example-text { font-size: 13px; color: var(--ink); line-height: 1.4; }
+
+/* ── Responsive ── */
+@media (max-width: 600px) {
+  header { padding: 0 20px; }
+  .hero { padding: 40px 20px 28px; }
+  .results-section { padding: 0 20px 60px; }
+  .std-card { padding: 18px 18px; }
+}
+</style>
+</head>
+<body>
+
+<!-- Splash screen -->
+<div id="splash">
+  <div class="splash-flag">
+    <div class="splash-stripe s"></div>
+    <div class="splash-stripe w"><div class="splash-wheel"></div></div>
+    <div class="splash-stripe g"></div>
+  </div>
+  <div class="splash-title">Find the right <em>IS Standard</em><br>for your product</div>
+  <div class="splash-dots">
+    <div class="splash-dot"></div>
+    <div class="splash-dot"></div>
+    <div class="splash-dot"></div>
+  </div>
+  <div class="splash-status">Loading BIS SP 21 · Building Materials</div>
+</div>
+
+<!-- Dynamic background -->
+<div id="bg-image"></div>
+<div id="bg-overlay"></div>
+
+<header>
+  <div class="logo">
+    <div class="logo-flag">
+      <div class="flag-stripe saffron"></div>
+      <div class="flag-stripe white"><div class="ashoka-dot"></div></div>
+      <div class="flag-stripe green"></div>
+    </div>
+    BIS Standards Engine
+  </div>
+  <span class="header-tag">Building Materials · SP 21</span>
+</header>
+
+<main>
+  <section class="hero">
+    <p class="hero-eyebrow">AI-Powered Compliance Discovery</p>
+    <h1>Find the right <em>IS Standard</em> for your product</h1>
+    <p class="hero-sub">Describe your building material product and get the top relevant BIS standards with a brief rationale — instantly.</p>
+
+    <div class="search-box">
+      <textarea id="query-input" placeholder="e.g. Ordinary Portland Cement for residential construction, 43 grade…" rows="2" autocomplete="off"></textarea>
+      <button class="search-btn" id="search-btn" onclick="doSearch()">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+          <circle cx="6.5" cy="6.5" r="4.5"/><line x1="10" y1="10" x2="14" y2="14"/>
+        </svg>
+        Find Standards
+      </button>
+    </div>
+
+    <div class="category-pills">
+      <span class="pill" onclick="setPill(this,'Cement')">Cement</span>
+      <span class="pill" onclick="setPill(this,'Steel')">Steel</span>
+      <span class="pill" onclick="setPill(this,'Concrete')">Concrete</span>
+      <span class="pill" onclick="setPill(this,'Aggregates')">Aggregates</span>
+      <span class="pill" onclick="setPill(this,'Bricks & Masonry')">Bricks &amp; Masonry</span>
+      <span class="pill" onclick="setPill(this,'Tiles')">Tiles</span>
+      <span class="pill" onclick="setPill(this,'Lime')">Lime</span>
+    </div>
+  </section>
+
+  <section class="results-section">
+    <div class="loading-state" id="loading-state">
+      <div class="bis-loader">
+        <div class="bis-bar"></div>
+        <div class="bis-bar"></div>
+        <div class="bis-bar"></div>
+        <div class="bis-bar"></div>
+        <div class="bis-bar"></div>
+      </div>
+      <p class="loading-label">Searching BIS SP 21…</p>
+      <p class="loading-sub">Hybrid BM25 + Semantic retrieval</p>
+    </div>
+
+    <div class="error-state" id="error-state">
+      <p id="error-msg">Could not connect to the recommendation engine. Make sure the backend is running at <code>http://localhost:8000</code>.</p>
+    </div>
+
+    <div class="query-header" id="query-header">
+      <p class="query-label">Results for</p>
+      <p class="query-text" id="query-display"></p>
+    </div>
+
+    <div class="stats-bar" id="stats-bar">
+      <div class="stat-item">
+        <span>Standards found</span>
+        <span class="stat-val" id="stat-count">—</span>
+      </div>
+      <div class="stat-item">
+        <span>Latency</span>
+        <span class="stat-val" id="stat-latency">—</span>
+      </div>
+      <div class="stat-item">
+        <span>Source</span>
+        <span class="stat-val">BIS SP 21</span>
+      </div>
+    </div>
+
+    <div class="results-grid" id="results-grid"></div>
+
+    <div class="full-rationale" id="full-rationale">
+      <div class="rationale-block">
+        <p class="rationale-block-header">Compliance Rationale</p>
+        <pre id="rationale-text"></pre>
+      </div>
+    </div>
+
+    <div id="empty-section">
+      <div class="examples" id="examples-section">
+        <p class="examples-label">Try an example query</p>
+        <div class="example-cards">
+          <div class="example-card" onclick="runExample(this)">
+            <p class="example-cat">Cement</p>
+            <p class="example-text">Ordinary Portland Cement 43 grade for general construction use</p>
+          </div>
+          <div class="example-card" onclick="runExample(this)">
+            <p class="example-cat">Steel</p>
+            <p class="example-text">High-strength deformed steel bars for reinforced concrete structures</p>
+          </div>
+          <div class="example-card" onclick="runExample(this)">
+            <p class="example-cat">Aggregates</p>
+            <p class="example-text">Crushed stone coarse aggregates for concrete mix design</p>
+          </div>
+          <div class="example-card" onclick="runExample(this)">
+            <p class="example-cat">Concrete</p>
+            <p class="example-text">Ready-mix concrete M25 grade for slab and beam construction</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+const API = 'http://localhost:8000';
+
+// ── Dynamic background images per category ────────────────────────────────────
+const BG_IMAGES = {
+  'Cement':        'https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=1600&q=80',
+  'Steel':         'https://images.unsplash.com/photo-1565793298595-6a879b1d9492?w=1600&q=80',
+  'Concrete':      'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=1600&q=80',
+  'Aggregates':    'https://images.unsplash.com/photo-1567016526105-22da7c13161a?w=1600&q=80',
+  'Bricks & Masonry': 'https://images.unsplash.com/photo-1590735213920-68192a487bc2?w=1600&q=80',
+  'Tiles':         'https://images.unsplash.com/photo-1615873968403-89e068629265?w=1600&q=80',
+  'Lime':          'https://images.unsplash.com/photo-1541888946425-d81bb19240f5?w=1600&q=80',
+  'default':       'https://images.unsplash.com/photo-1486325212027-8081e485255e?w=1600&q=80',
+};
+
+function setBackground(category) {
+  const url = BG_IMAGES[category] || BG_IMAGES['default'];
+  const bg = document.getElementById('bg-image');
+  // Fade out, swap, fade in
+  bg.classList.remove('visible');
+  setTimeout(() => {
+    bg.style.backgroundImage = `url('${url}')`;
+    bg.classList.add('visible');
+  }, 400);
+}
+
+// ── Splash dismiss ────────────────────────────────────────────────────────────
+window.addEventListener('load', () => {
+  setBackground('default');
+  setTimeout(() => {
+    document.getElementById('splash').classList.add('hidden');
+  }, 1800);
+});
+
+// ── Pills ─────────────────────────────────────────────────────────────────────
+function setPill(el, cat) {
+  document.querySelectorAll('.pill').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('query-input').value = cat + ' for building construction';
+  document.getElementById('query-input').focus();
+  setBackground(cat);
+}
+
+function fillPill(cat) {
+  document.getElementById('query-input').value = cat + ' for building construction';
+  document.getElementById('query-input').focus();
+  setBackground(cat);
+}
+
+function runExample(el) {
+  const text = el.querySelector('.example-text').textContent;
+  const cat  = el.querySelector('.example-cat').textContent;
+  document.getElementById('query-input').value = text;
+  setBackground(cat);
+  doSearch();
+}
+
+// ── State manager ─────────────────────────────────────────────────────────────
+function setState(state) {
+  document.getElementById('loading-state').classList.toggle('active', state === 'loading');
+  document.getElementById('error-state').classList.toggle('active', state === 'error');
+  document.getElementById('query-header').classList.toggle('active', state === 'results');
+  document.getElementById('stats-bar').classList.toggle('active', state === 'results');
+  document.getElementById('full-rationale').classList.toggle('active', state === 'results');
+  document.getElementById('empty-section').style.display = (state === 'idle') ? '' : 'none';
+  if (state !== 'results') document.getElementById('results-grid').innerHTML = '';
+}
+
+// ── Rationale parser ──────────────────────────────────────────────────────────
+function parseRationaleLines(rationale) {
+  const lines = rationale.split('\n').filter(l => l.trim());
+  const out = {};
+  for (const line of lines) {
+    const match = line.match(/IS[\s:\-]*(\d[\w\-]*)/i);
+    if (match) {
+      const id = 'IS ' + match[1].trim();
+      const reason = line
+        .replace(/^\d+\.\s*/, '')
+        .replace(/IS[\s:\-]*\d[\w\-]*[\s]*[–\-]+\s*/i, '')
+        .trim();
+      out[id] = reason;
+    }
+  }
+  return out;
+}
+
+// ── Main search ───────────────────────────────────────────────────────────────
+async function doSearch() {
+  const query = document.getElementById('query-input').value.trim();
+  if (!query) return;
+
+  const btn = document.getElementById('search-btn');
+  btn.disabled = true;
+  setState('loading');
+
+  // Auto-detect category from query for background
+  const queryLower = query.toLowerCase();
+  for (const [cat] of Object.entries(BG_IMAGES)) {
+    if (queryLower.includes(cat.toLowerCase())) { setBackground(cat); break; }
+  }
+
+  const t0 = performance.now();
+
+  try {
+    // Phase 1: Fast retrieval
+    const resp = await fetch(`${API}/retrieve`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ product_description: query })
+    });
+    if (!resp.ok) throw new Error(`Server error: ${resp.status}`);
+    const data = await resp.json();
+    const elapsed = ((performance.now() - t0) / 1000).toFixed(2);
+
+    document.getElementById('query-display').textContent = `"${query}"`;
+    document.getElementById('stat-count').textContent = (data.standards || []).length;
+    document.getElementById('stat-latency').textContent = `${elapsed}s`;
+    document.getElementById('rationale-text').textContent = '';
+
+    const grid = document.getElementById('results-grid');
+    grid.innerHTML = '';
+
+    (data.standards || []).slice(0, 5).forEach((std, i) => {
+      const safeId = std.id.replace(/\s/g, '-');
+      const card = document.createElement('div');
+      card.className = 'std-card';
+      card.id = `card-${safeId}`;
+      card.innerHTML = `
+        <div class="card-top">
+          <span class="std-id">${std.id}</span>
+          <span class="rank-badge">#${i + 1} match</span>
+        </div>
+        ${std.title && std.title !== std.id ? `<p class="std-title">${std.title}</p>` : ''}
+        <div class="std-rationale" id="rationale-${safeId}" style="display:none">
+          <p class="rationale-label">Why this applies</p>
+          <span class="rationale-reason"></span>
+        </div>
+        <div class="card-footer">
+          <button class="learn-btn" onclick="learnMore('${std.id}', this)">
+            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="8" cy="8" r="6.5"/><line x1="8" y1="7" x2="8" y2="11"/><circle cx="8" cy="5" r="0.5" fill="currentColor" stroke="none"/></svg>
+            Learn more about ${std.id}
+          </button>
+          <div class="explain-box" id="explain-${safeId}" style="display:none"></div>
+        </div>
+      `;
+      grid.appendChild(card);
+    });
+
+    setState('results');
+    btn.disabled = false;
+
+    // Phase 2: Async rationale
+    document.getElementById('rationale-text').textContent = 'Generating rationale…';
+    fetch(`${API}/rationale`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ product_description: query })
+    })
+    .then(r => r.json())
+    .then(r => {
+      const rationaleMap = parseRationaleLines(r.rationale || '');
+      document.getElementById('rationale-text').textContent = r.rationale || '';
+      for (const [id, reason] of Object.entries(rationaleMap)) {
+        const safeId = id.replace(/\s/g, '-');
+        const block = document.getElementById(`rationale-${safeId}`);
+        if (block && reason) {
+          block.querySelector('.rationale-reason').textContent = reason;
+          block.style.display = 'block';
+        }
+      }
+    })
+    .catch(() => {
+      document.getElementById('rationale-text').textContent = 'Rationale unavailable.';
+    });
+
+  } catch (err) {
+    document.getElementById('error-msg').textContent = err.message || 'Failed to connect. Is the backend running?';
+    setState('error');
+    document.getElementById('empty-section').style.display = '';
+    btn.disabled = false;
+  }
+}
+
+// ── Learn More ────────────────────────────────────────────────────────────────
+async function learnMore(standardId, btn) {
+  const safeId = standardId.replace(/\s/g, '-');
+  const box = document.getElementById(`explain-${safeId}`);
+  if (box.style.display !== 'none') {
+    box.style.display = 'none';
+    btn.innerHTML = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="8" cy="8" r="6.5"/><line x1="8" y1="7" x2="8" y2="11"/><circle cx="8" cy="5" r="0.5" fill="currentColor" stroke="none"/></svg> Learn more about ${standardId}`;
+    return;
+  }
+  btn.disabled = true;
+  box.style.display = 'block';
+  box.innerHTML = `<div class="explain-loading"><div class="explain-spinner"></div>Generating explanation for ${standardId}…</div>`;
+  try {
+    const resp = await fetch(`${API}/explain`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ standard_id: standardId })
+    });
+    const data = await resp.json();
+    box.textContent = data.explanation || 'No explanation available.';
+    btn.innerHTML = `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="8" cy="8" r="6.5"/><line x1="8" y1="9" x2="8" y2="5"/><circle cx="8" cy="11" r="0.5" fill="currentColor" stroke="none"/></svg> Hide details`;
+  } catch (e) {
+    box.textContent = 'Could not load explanation. Please try again.';
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ── Keyboard shortcuts ────────────────────────────────────────────────────────
+document.getElementById('query-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); doSearch(); }
+});
+document.getElementById('query-input').addEventListener('input', function() {
+  this.style.height = 'auto';
+  this.style.height = Math.min(this.scrollHeight, 160) + 'px';
+});
+</script>
+</body>
+</html>
